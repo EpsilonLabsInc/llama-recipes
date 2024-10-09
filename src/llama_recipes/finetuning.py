@@ -89,6 +89,7 @@ def main(**kwargs):
 
     print(">>> train_config")
     print(train_config)
+    print(f"train_config.save_steps: {train_config.save_steps}")
 
     # Set the seeds for reproducibility
     if is_xpu_available():

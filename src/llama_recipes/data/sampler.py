@@ -9,13 +9,13 @@ import torch
 
 
 class LengthBasedBatchSampler(torch.utils.data.BatchSampler):
-    def __init__(self, data_source, batch_size: int, drop_last: bool, shuffle: bool=True) -> None:
+    def __init__(
+        self, data_source, batch_size: int, drop_last: bool, shuffle: bool = True
+    ) -> None:
         if isinstance(next(iter(data_source)), dict):
             first_key = next(iter(next(iter(data_source)).keys()))
-            first_key = 'image'
+            first_key = "image" # tmp fix for gpt(mimic, chexpertplus, gradient) dataset
             self.lengths = [len(d[first_key]) for d in data_source]
-            
-            print(f"self.lengths: {self.lengths}")
         else:
             self.lengths = [len(d) for d in data_source]
         self.batch_size = batch_size
@@ -23,11 +23,13 @@ class LengthBasedBatchSampler(torch.utils.data.BatchSampler):
         self.shuffle = shuffle
 
     def __iter__(self):
-        ids = np.argsort(self.lengths, kind='mergesort')
+        ids = np.argsort(self.lengths, kind="mergesort")
         if self.drop_last:
-            ids = ids[:len(ids) // self.batch_size * self.batch_size]
+            ids = ids[: len(ids) // self.batch_size * self.batch_size]
 
-        batches = [ids[i:i+self.batch_size] for i in range(0, len(ids), self.batch_size)]
+        batches = [
+            ids[i : i + self.batch_size] for i in range(0, len(ids), self.batch_size)
+        ]
 
         if self.shuffle:
             random.shuffle(batches)
@@ -39,15 +41,25 @@ class LengthBasedBatchSampler(torch.utils.data.BatchSampler):
         if self.drop_last:
             return len(self.lengths) // self.batch_size
         else:
-            return len(self.lengths) // self.batch_size + (len(self.lengths) % self.batch_size > 0)
+            return len(self.lengths) // self.batch_size + (
+                len(self.lengths) % self.batch_size > 0
+            )
 
 
 class DistributedLengthBasedBatchSampler(torch.utils.data.BatchSampler):
-    def __init__(self, data_source, batch_size: int, num_replicas: int, rank: int, shuffle: bool = True, seed: int = 0) -> None:
+    def __init__(
+        self,
+        data_source,
+        batch_size: int,
+        num_replicas: int,
+        rank: int,
+        shuffle: bool = True,
+        seed: int = 0,
+    ) -> None:
         random.seed(seed)
         self.batch_sampler = LengthBasedBatchSampler(
             data_source, batch_size=batch_size, drop_last=True, shuffle=shuffle
-            )
+        )
         self.num_replicas = num_replicas
         self.rank = rank
 

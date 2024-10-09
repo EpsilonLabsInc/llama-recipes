@@ -260,24 +260,27 @@ def load_sharded_model_single_gpu(model, model_path):
 def save_peft_checkpoint(model, model_path, epoch):
     """save_pretrained peft model"""
 
-    model_path = os.path.join(model_path, epoch)
+    model_path = os.path.join(model_path, f"checkpoint_lora_{str(epoch)}")
 
-    options = StateDictOptions(full_state_dict=True, cpu_offload=True)
+    if not os.path.exists(model_path):
+        options = StateDictOptions(full_state_dict=True, cpu_offload=True)
 
-    if isinstance(model, FSDP):
-        state_dict = get_model_state_dict(model, options=options)
-        model.save_pretrained(model_path, state_dict=state_dict)
-    else:
-        model.save_pretrained(model_path)
+        if isinstance(model, FSDP):
+            state_dict = get_model_state_dict(model, options=options)
+            model.save_pretrained(model_path, state_dict=state_dict)
+        else:
+            model.save_pretrained(model_path)
 
 
 def save_model_checkpoint(model, output_dir, epoch):
     """save model when not peft and on single device"""
 
-    output_dir = os.path.join(output_dir, epoch)
+    output_dir = os.path.join(output_dir, f"checkpoint_{str(epoch)}")
 
-    output_file = Path(output_dir) / "model.pt"
+    if not os.path.exists(output_dir):
 
-    state_dict = model.state_dict()
+        output_file = Path(output_dir) / "model.pt"
 
-    torch.save(state_dict, output_file)
+        state_dict = model.state_dict()
+
+        torch.save(state_dict, output_file)

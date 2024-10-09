@@ -56,4 +56,5 @@ torchrun \
   --report_to "tensorboard" \
   --logging_steps 5 \
   --save_metrics True \
+  --save_steps 10000 \
   2>&1 | tee -a "${OUTPUT_DIR}/training_log.txt"

@@ -151,6 +151,9 @@ def train(
     total_train_steps = 0
     max_steps_reached = False  # Flag to indicate max training steps reached
     # Start the training loop
+
+    update_steps = 0  # Counter for steps where the model parameters are updated
+
     for epoch in range(train_config.num_epochs):
         print(f"Starting epoch {epoch}/{train_config.num_epochs}")
         print(f"train_config.max_train_step: {train_config.max_train_step}")
@@ -229,6 +232,8 @@ def train(
                             scaler.update()
                             optimizer.zero_grad()
                             pbar.update(1)
+                            update_steps += 1
+
                     else:
                         # regular backpropagation when fp16 is not used
                         loss.backward()
@@ -251,6 +256,25 @@ def train(
                             optimizer.step()
                             optimizer.zero_grad()
                             pbar.update(1)
+                            update_steps += 1
+
+                    if update_steps > 0 and update_steps % train_config.save_steps == 0:
+                        print(f"Saving model at step {update_steps}")
+                        if train_config.enable_fsdp:
+                            dist.barrier()
+
+                        if train_config.use_peft:
+                            save_peft_checkpoint(
+                                model, train_config.output_dir, update_steps
+                            )
+                        else:
+                            save_model_checkpoint(
+                                model, train_config.output_dir, update_steps
+                            )
+
+                        if train_config.enable_fsdp:
+                            dist.barrier()
+
                     if train_config.use_profiler or train_config.flop_counter:
                         profile_context.step()
                     if train_config.flop_counter and profile_context.is_done():
@@ -337,7 +361,7 @@ def train(
                         print(f"we are about to save the PEFT modules")
                 else:
                     print(f"we are about to save the PEFT modules")
-                save_peft_checkpoint(model, train_config.output_dir, epoch)
+                save_peft_checkpoint(model, train_config.output_dir, total_train_steps)
                 if train_config.enable_fsdp:
                     if rank == 0:
                         print(
@@ -350,7 +374,9 @@ def train(
 
             else:
                 if not train_config.enable_fsdp:
-                    save_model_checkpoint(model, train_config.output_dir, epoch)
+                    save_model_checkpoint(
+                        model, train_config.output_dir, total_train_steps
+                    )
 
                 elif fsdp_config.checkpoint_type == StateDictType.FULL_STATE_DICT:
                     print(" Saving the FSDP model checkpoint using FULL_STATE_DICT")
