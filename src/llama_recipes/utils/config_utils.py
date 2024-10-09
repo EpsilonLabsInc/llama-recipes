@@ -15,9 +15,19 @@ from peft import (
 from transformers import default_data_collator
 from transformers.data import DataCollatorForSeq2Seq
 
-from llama_recipes.configs import datasets, lora_config, llama_adapter_config, prefix_config, train_config
-from llama_recipes.data.sampler import LengthBasedBatchSampler, DistributedLengthBasedBatchSampler
+from llama_recipes.configs import (
+    datasets,
+    lora_config,
+    llama_adapter_config,
+    prefix_config,
+    train_config,
+)
+from llama_recipes.data.sampler import (
+    LengthBasedBatchSampler,
+    DistributedLengthBasedBatchSampler,
+)
 from llama_recipes.datasets import DATASET_PREPROC
+
 
 def update_config(config, **kwargs):
     if isinstance(config, (tuple, list)):
@@ -49,10 +59,14 @@ def generate_peft_config(train_config, kwargs):
         raise RuntimeError(f"Peft config not found: {train_config.peft_method}")
 
     if train_config.peft_method == "prefix":
-        raise RuntimeError("PrefixTuning is currently not supported (see https://github.com/meta-llama/llama-recipes/issues/359#issuecomment-2089350811)")
+        raise RuntimeError(
+            "PrefixTuning is currently not supported (see https://github.com/meta-llama/llama-recipes/issues/359#issuecomment-2089350811)"
+        )
 
     if train_config.enable_fsdp and train_config.peft_method == "llama_adapter":
-        raise RuntimeError("Llama_adapter is currently not supported in combination with FSDP (see https://github.com/meta-llama/llama-recipes/issues/359#issuecomment-2089274425)")
+        raise RuntimeError(
+            "Llama_adapter is currently not supported in combination with FSDP (see https://github.com/meta-llama/llama-recipes/issues/359#issuecomment-2089274425)"
+        )
 
     config = configs[names.index(train_config.peft_method)]()
 
@@ -68,16 +82,22 @@ def generate_dataset_config(train_config, kwargs):
 
     assert train_config.dataset in names, f"Unknown dataset: {train_config.dataset}"
 
-    dataset_config = {k:v for k, v in inspect.getmembers(datasets)}[train_config.dataset]()
+    dataset_config = {k: v for k, v in inspect.getmembers(datasets)}[
+        train_config.dataset
+    ]()
 
     update_config(dataset_config, **kwargs)
 
-    return  dataset_config
+    return dataset_config
 
 
 def get_dataloader_kwargs(train_config, dataset, dataset_processer, mode):
     kwargs = {}
-    batch_size = train_config.batch_size_training if mode=="train" else train_config.val_batch_size
+    batch_size = (
+        train_config.batch_size_training
+        if mode == "train"
+        else train_config.val_batch_size
+    )
     if train_config.batching_strategy == "padding":
         if train_config.enable_fsdp:
             kwargs["batch_sampler"] = DistributedLengthBasedBatchSampler(
@@ -85,20 +105,22 @@ def get_dataloader_kwargs(train_config, dataset, dataset_processer, mode):
                 batch_size=batch_size,
                 rank=dist.get_rank(),
                 num_replicas=dist.get_world_size(),
-                shuffle=mode=="train",
+                shuffle=mode == "train",
             )
         else:
-            kwargs["batch_sampler"] = LengthBasedBatchSampler(dataset, batch_size, drop_last=True, shuffle=mode=="train")
+            kwargs["batch_sampler"] = LengthBasedBatchSampler(
+                dataset, batch_size, drop_last=True, shuffle=mode == "train"
+            )
         kwargs["collate_fn"] = DataCollatorForSeq2Seq(dataset_processer)
     elif train_config.batching_strategy == "packing":
         if train_config.enable_fsdp:
             kwargs["sampler"] = DistributedSampler(
-            dataset,
-            rank=dist.get_rank(),
-            num_replicas=dist.get_world_size(),
-            shuffle=mode=="train",
-            drop_last=True,
-        )
+                dataset,
+                rank=dist.get_rank(),
+                num_replicas=dist.get_world_size(),
+                shuffle=mode == "train",
+                drop_last=True,
+            )
         kwargs["batch_size"] = batch_size
         kwargs["drop_last"] = True
         kwargs["collate_fn"] = default_data_collator
@@ -116,7 +138,6 @@ def check_fsdp_config(fsdp_config):
         }
         if fsdp_config.checkpoint_type in str_to_obj:
             fsdp_config.checkpoint_type = str_to_obj[fsdp_config.checkpoint_type]
-        
+
     if not fsdp_config.checkpoint_type in VALID_TYPES:
         raise ValueError(f"Invalid checkpoint_type {fsdp_config.checkpoint_type}")
-    

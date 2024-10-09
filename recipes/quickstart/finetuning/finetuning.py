@@ -4,5 +4,9 @@
 import fire
 from llama_recipes.finetuning import main
 
+from huggingface_hub import login
+
+login("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")
+
 if __name__ == "__main__":
     fire.Fire(main)

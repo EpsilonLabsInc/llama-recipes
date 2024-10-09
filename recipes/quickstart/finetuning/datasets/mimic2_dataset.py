@@ -3,9 +3,18 @@
 
 
 import copy
-from datasets import load_dataset
 import itertools
+import re
+
 import torch
+from datasets import load_dataset
+from PIL import Image
+
+print("@@@ using mimic2_dataset.py")
+
+def remove_image_tags(text):
+    # Use regex to match one or more <image> tags at the beginning of the string
+    return re.sub(r"^(<image>)+", "", text)
 
 
 # check system prompt token seq or user prompt token seq is in the current token list
@@ -59,18 +68,21 @@ def tokenize_dialogs(dialogs, images, processor):
 
 
 def get_custom_dataset(dataset_config, processor, split, split_ratio=0.9):
-    # load_dataset will return DatasetDict that contains all the data in the train set
-    dataset_dict = load_dataset("HuggingFaceM4/the_cauldron", name="ocrvqa")
-    dataset = dataset_dict["train"]
-    # Comment out the following line to use the full dataset, for quick testing only use 2000 samples
-    dataset = dataset.select(range(2000))
-    dataset = dataset.train_test_split(
-        test_size=1 - split_ratio, shuffle=True, seed=42
-    )[split]
+    train_jsonl_path = "/mnt/data/ruian/mimic2/gpt/train_dataset_gpt_labels.jsonl"
+    test_jsonl_path = "/mnt/data/ruian/mimic2/gpt/test_dataset_gpt_labels.jsonl"
+
+    data_files = {"train": train_jsonl_path, "test": test_jsonl_path}
+    dataset_dict = load_dataset("json", data_files=data_files)
+
+    if split == "train":
+        dataset = dataset_dict["train"]
+    elif split == "test":
+        dataset = dataset_dict["test"]
+
     return dataset
 
 
-class OCRVQADataCollator:
+class GPTDataCollator:
     def __init__(self, processor):
         self.processor = processor
         self.processor.tokenizer.padding_side = (
@@ -78,57 +90,36 @@ class OCRVQADataCollator:
         )
 
     def __call__(self, samples):
-        dialogs, images = [], []
+        dialogs, images_list = [], []
         for sample in samples:
-            image_list, sample_list = sample["images"], sample["texts"]
-            if len(image_list) > 1:
-                raise ValueError("Only support one image per sample")
-            image = image_list[0].convert("RGB")  # only use the first image
-            dialog = []
-            for sample_dict in sample_list:
-                if not dialog:
-                    # only append image to the first sentence
-                    dialog += [
-                        {
-                            "role": "user",
-                            "content": [
-                                {"type": "image"},
-                                {"type": "text", "text": sample_dict["user"].strip()},
-                            ],
-                        },
-                        {
-                            "role": "assistant",
-                            "content": [
-                                {
-                                    "type": "text",
-                                    "text": sample_dict["assistant"].strip(),
-                                }
-                            ],
-                        },
-                    ]
+            image_list, sample_list = sample["image"], sample["conversations"]
 
-                else:
-                    dialog += [
-                        {
-                            "role": "user",
-                            "content": [
-                                {"type": "text", "text": sample_dict["user"].strip()}
-                            ],
-                        },
-                        {
-                            "role": "assistant",
-                            "content": [
-                                {
-                                    "type": "text",
-                                    "text": sample_dict["assistant"].strip(),
-                                }
-                            ],
-                        },
-                    ]
+            images = [
+                Image.open(each_image).convert("RGB") for each_image in image_list
+            ]
+
+            user_content = [{"type": "image"}] * len(image_list)
+            user_text = remove_image_tags(sample_list[0]["value"])
+            user_content.append(user_text)
+
+            user_msg = {"role": "user", "content": user_content}
+
+            assistant_msg = {
+                "role": "assistant",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": sample_list[1]["value"],
+                    }
+                ],
+            }
+
+            dialog = [user_msg, assistant_msg]
+
             dialogs.append(dialog)
-            images.append([image])
-        return tokenize_dialogs(dialogs, images, self.processor)
+            images_list.append(images)
+        return tokenize_dialogs(dialogs, images_list, self.processor)
 
 
 def get_data_collator(processor):
-    return OCRVQADataCollator(processor)
+    return GPTDataCollator(processor)

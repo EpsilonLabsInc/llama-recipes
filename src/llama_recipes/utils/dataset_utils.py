@@ -27,6 +27,7 @@ def get_preprocessed_dataset(
         get_split(),
     )
 
+
 def get_custom_data_collator(
     dataset_processer, dataset_config
 ) -> torch.utils.data.Dataset:
@@ -34,14 +35,14 @@ def get_custom_data_collator(
         return None
 
     return DATALOADER_COLLATE_FUNC[dataset_config.dataset](
-        dataset_processer,
-        dataset_config
+        dataset_processer, dataset_config
     )
+
 
 def get_dataloader(tokenizer, dataset_config, train_config, split: str = "train"):
     dataset = get_preprocessed_dataset(tokenizer, dataset_config, split)
     dl_kwargs = get_dataloader_kwargs(train_config, dataset, tokenizer, split)
-    
+
     if split == "train" and train_config.batching_strategy == "packing":
         dataset = ConcatDataset(dataset, chunk_size=train_config.context_length)
 
@@ -53,4 +54,3 @@ def get_dataloader(tokenizer, dataset_config, train_config, split: str = "train"
         **dl_kwargs,
     )
     return dataloader
-    

@@ -3,3 +3,7 @@ __pycache__
 .ipynb_checkpoints
 wandb/
 artifacts/
+
+output.log
+core
+.vscode

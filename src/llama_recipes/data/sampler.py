@@ -12,7 +12,10 @@ class LengthBasedBatchSampler(torch.utils.data.BatchSampler):
     def __init__(self, data_source, batch_size: int, drop_last: bool, shuffle: bool=True) -> None:
         if isinstance(next(iter(data_source)), dict):
             first_key = next(iter(next(iter(data_source)).keys()))
+            first_key = 'image'
             self.lengths = [len(d[first_key]) for d in data_source]
+            
+            print(f"self.lengths: {self.lengths}")
         else:
             self.lengths = [len(d) for d in data_source]
         self.batch_size = batch_size
