@@ -4,7 +4,7 @@ set -x
 # Set default values
 GPUS=${GPUS:-1}
 PER_DEVICE_BATCH_SIZE=${PER_DEVICE_BATCH_SIZE:-2}
-BATCH_SIZE=${BATCH_SIZE:-16}
+BATCH_SIZE=${BATCH_SIZE:-128}
 GRADIENT_ACC=$((BATCH_SIZE / PER_DEVICE_BATCH_SIZE / GPUS))
 
 # Model and dataset settings
@@ -17,7 +17,7 @@ export PYTHONPATH="${PYTHONPATH}:$(pwd)"
 export MASTER_PORT=29500  # Change port if needed
 
 LR=1e-5
-NUM_EPOCHS=2
+NUM_EPOCHS=3
 
 # Timestamp for log files
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
@@ -56,5 +56,5 @@ torchrun \
   --report_to "tensorboard" \
   --logging_steps 5 \
   --save_metrics True \
-  --save_steps 10000 \
+  --save_steps 100 \
   2>&1 | tee -a "${OUTPUT_DIR}/training_log.txt"
